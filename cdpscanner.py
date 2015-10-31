@@ -230,7 +230,7 @@ if __name__ == '__main__':
         current_set = set(host_set)
 
     #After everything has been completed or removed
-    if inventory_enabled = True:
+    if inventory_enabled == True:
         print inventory
     for line in failed_hosts:
         print '[!] %s failed both ssh and telnet' % line
