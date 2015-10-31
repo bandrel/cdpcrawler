@@ -75,7 +75,8 @@ def cli_parser():
                 helpmsg()
                 print e
                 sys.exit()
-        elif opt in ('-d', '--directory'):
+    for opt, arg in opts:
+        if opt in ('-d', '--directory'):
             working_directory = arg
             try:
                 os.chdir(working_directory)
