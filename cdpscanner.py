@@ -49,14 +49,17 @@ def cli_parser():
         elif opt in ('-i', '--input'):
             inputfile = arg
             with open(org_dir+'/'+inputfile, 'rb') as hostfile:
-                for host_name in hostfile:
+                for device in hostfile:
                     try:
-                        dns_name,empty,ip_from_host = socket.gethostbyaddr(host_name.rstrip('\r\n'))
-                        host_set.add(ip_from_host[0])
-                    except socket.gaierror:
-                        print "%s is not a valid host name or IP address" % host_name
-                    except socket.herror:
-                        print "%s is not a valid host name or IP address" % host_name
+                        socket.inet_aton(device)
+                    except:
+                        try:
+                            dns_name,empty,ip_from_host = socket.gethostbyaddr(device.rstrip('\r\n'))
+                            host_set.add(ip_from_host[0])
+                        except socket.gaierror:
+                            print "%s is not a valid host name or IP address" % device
+                        except socket.herror:
+                            print "%s is not a valid host name or IP address" % device
         elif opt in ('-t', '--disable-telnet'):
             telnet_disabled = True
         elif opt in ('-v', '--verbose'):
