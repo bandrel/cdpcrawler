@@ -23,7 +23,8 @@ def helpmsg():
           '  -p or --password: Specifies the password to use\n' \
           '  -c or --commands: Specifies a list of commands to send\n' \
           '  -v or --verbose: Enables verbose output\n'\
-          '  -t or --disable-telnet:  Disables fallback to telnet'
+          '  -t or --disable-telnet:  Disables fallback to telnet\n' \
+          '  -d or --directory: Specifies a a directory to place the output files into'
 
 #Command line argument parser
 def cli_parser():
