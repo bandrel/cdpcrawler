@@ -24,7 +24,8 @@ def helpmsg():
           '  -c or --commands: Specifies a list of commands to send\n' \
           '  -v or --verbose: Enables verbose output\n'\
           '  -t or --disable-telnet:  Disables fallback to telnet\n' \
-          '  -d or --directory: Specifies a a directory to place the output files into'
+          '  -d or --directory: Specifies a a directory to place the output files into\n'\
+          '  --inventory:  Prints the inventory of all of the devices at the end\n'
 
 #Command line argument parser
 def cli_parser():
@@ -35,10 +36,11 @@ def cli_parser():
     global verbose_mode
     global telnet_disabled
     global host_set
+    global inventory_enabled
     import getpass
     try:
         opts, args = getopt.getopt(sys.argv[1:],"i:u:p:c:hd:vt",["input=", "user=", "password=", "commands=",
-                                                                 "directory=","verbose","disable-telnet"])
+                                                                 "directory=","verbose","disable-telnet","inventory"])
     except getopt.GetoptError:
         helpmsg()
         sys.exit(2)
@@ -52,6 +54,7 @@ def cli_parser():
                 for device in hostfile:
                     try:
                         socket.inet_aton(device)
+                        host_set.add(device)
                     except:
                         try:
                             dns_name,empty,ip_from_host = socket.gethostbyaddr(device.rstrip('\r\n'))
@@ -68,6 +71,8 @@ def cli_parser():
             username = arg
         elif opt in ('-p', '--password'):
             password = arg
+        elif opt in ('--inventory'):
+            inventory_enabled = True
         elif opt in ('-c', '--commands'):
             commands = []
             try:
@@ -102,14 +107,19 @@ def telnet_getinfo(username,password, host, commands):
     outputfile = str(host)+ '.txt'
     tn = telnetlib.Telnet(host)
     print "telnet connection established to %s" % host
-    tn.read_until("username: ")
-    tn.write(username + "\r\n")
-    tn.read_until("password: ")
-    tn.write(password + "\r\n")
-    tn.write("terminal length 0\r\n")
+    tn.expect(['[Uu]sername: '],timeout=5)
+    tn.write(username + '\r\n')
+    tn.expect(['[Pp]assword: '])
+    tn.write(password + '\r\n')
+    enable_prompt = tn.expect([r'>$'],timeout=1)
+    if enable_prompt[1] == None:
+        pass
+    else:
+        tn.write('enable\r\n'+password+'\r\n')
+    tn.write('terminal length 0\r\n')
     for command in commands:
         tn.write(command + '\r\n')
-    tn.write("exit\r\n")
+    tn.write('exit\r\n')
     output = tn.read_all()
     with open(outputfile, 'wb') as outfile:
         outfile.write(output)
@@ -125,7 +135,6 @@ def ssh_getinfo(username,password,host,commands):
         # Clear the buffer on the screen
         output = remote_conn.recv(1000)
         return output
-    dns_name,empty,ip_from_host = socket.gethostbyaddr(host)
     print "Connecting to " + host + "\r\n"
     # Create instance of SSHClient object
     remote_conn_pre = paramiko.SSHClient()
@@ -133,7 +142,7 @@ def ssh_getinfo(username,password,host,commands):
     remote_conn_pre.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     # initiate SSH connection
     remote_conn_pre.connect(host, username=username, password=password,timeout=TIMEOUT)
-    print "SSH connection established to %s" % dns_name
+    print "SSH connection established to %s" % host
     # Use invoke_shell to establish an 'interactive session'
     remote_conn = remote_conn_pre.invoke_shell()
     print "Interactive SSH session established"
@@ -153,10 +162,21 @@ def ssh_getinfo(username,password,host,commands):
     output = remote_conn.recv(10000)
     if verbose_mode == True:
         print output
-    with open(dns_name+'.txt','w') as outputfile:
+    with open(host+'.txt','w') as outputfile:
         for line in output:
             outputfile.write(line)
     return output
+def output_parse(output):
+    global host_set
+    global seen_before
+    global inventory
+    matches = re.findall(r'Device ID: (\S+)\r*\nIP address: (\S+)\r*\nPlatform: cisco (WS-\S+,)',device_output)
+    for match in matches:
+        inventory.add(matches)
+        if match[1] not in seen_before:
+            host_set.add(match[1])
+            seen_before.add(match[1])
+
 if __name__ == '__main__':
     #Declaration of global variables
     inputfile = None
@@ -173,6 +193,8 @@ if __name__ == '__main__':
     current_set = set(host_set)
     seen_before = set()
     device = []
+    inventory = set()
+    inventory_enabled = False
 
     # Default commamnds if none are specififed in the CLI arguments
     commands = ['show cdp neighbor detail',
@@ -192,34 +214,13 @@ if __name__ == '__main__':
                 # Try SSH and if that fails try telnet.
                 device_output = ssh_getinfo(username,password,currenthost,commands).split('\r\n')
                 # Check output for new hostnames
-                for line in device_output:
-                    a = re.search(r'^  IP address: (\S+)',line)
-                    b = re.search(r'^Platform: cisco (WS-\S+)',line)
-                    #if a regex match is found add the match to the host_set, but only if it has not been seen before
-                    if a is not None:
-                        ip_address = a.group(1)
-                    if b is not None:
-                        model = b.group(1)
-                        if ip_address not in seen_before:
-                            host_set.add(ip_address)
-                            seen_before.add(ip_address)
-            except Exception as e:
-                print e
+                output_parse(device_output)
+            except:
                 if telnet_disabled is not True:
                     try:
-                        for line in device_output:
-                            a = re.search(r'^  IP address: (\S+)',line)
-                            b = re.search(r'^Platform: cisco (WS-\S+)',line)
-                            #if a regex match is found add the match to the host_set, but only if it has not been seen before
-                            if a is not None:
-                                ip_address = a.group(1)
-                            if b is not None:
-                                model = b.group(1)
-                                if ip_address not in seen_before:
-                                    host_set.add(ip_address)
-                                    seen_before.add(ip_address)
-                    except Exception as e:
-                        print e
+                        device_output = telnet_getinfo(username,password,currenthost,commands)
+                        output_parse(device_output)
+                    except:
                         # If both ssh and telnet fail add to a failed_hosts list
                         failed_hosts.add(currenthost.upper())
                 else:
@@ -229,5 +230,7 @@ if __name__ == '__main__':
         current_set = set(host_set)
 
     #After everything has been completed or removed
+    if inventory_enabled = True:
+        print inventory
     for line in failed_hosts:
         print '[!] %s failed both ssh and telnet' % line
