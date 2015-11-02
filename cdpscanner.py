@@ -198,7 +198,7 @@ if __name__ == '__main__':
     inventory_enabled = False
     failed_telnet = []
     failed_ssh = []
-    cdp_regex = re.compile(r'Device ID: (\S+)\r\nEntry address\(es\): \r\n  IP address: (\S+)\r\nPlatform: cisco (\S+),  Capabilities: (Switch|Router).*')
+    cdp_regex = re.compile(r'Device ID: *(\S+)\r\n(?:.*\r\n){3}\ +IP(?:v4)* [aA]ddress:\ (\S+)\r\nPlatform: (?:cisco )*(\S+), Capabilities.*(Switch|Router)')
     # Default commamnds if none are specififed in the CLI arguments
     commands = ['show cdp neighbor detail',
                 'show inventory']
