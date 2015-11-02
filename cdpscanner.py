@@ -170,7 +170,7 @@ def output_parse(output):
     global host_set
     global seen_before
     global inventory
-    output_as_string = '\r\n'.join(output)
+    output_as_string = output
     matches = re.findall(cdp_regex,output_as_string)
     for match in matches:
         inventory.append(matches)
@@ -216,7 +216,7 @@ if __name__ == '__main__':
             device_output = ''
             try:
                 # Try SSH and if that fails try telnet.
-                device_output = ssh_getinfo(username,password,currenthost,commands).split('\r\n')
+                device_output = ssh_getinfo(username,password,currenthost,commands)
                 # Check output for new hostnames
             except:
                 failed_ssh.append(host)
