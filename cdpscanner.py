@@ -53,12 +53,12 @@ def cli_parser():
             with open(org_dir+'/'+inputfile, 'rb') as hostfile:
                 for device in hostfile:
                     try:
-                        socket.inet_aton(device)
-                        host_set.add(device)
+                        socket.inet_aton(device.rstrip('\r\n'))
+                        host_set.add(device.rstrip('\r\n'))
                     except:
                         try:
-                            dns_name,empty,ip_from_host = socket.gethostbyaddr(device.rstrip('\r\n'))
-                            host_set.add(ip_from_host[0])
+                            ip_from_host = socket.gethostbyname(device.rstrip('\r\n'))
+                            host_set.add(ip_from_host)
                         except socket.gaierror:
                             print "%s is not a valid host name or IP address" % device
                         except socket.herror:
@@ -170,7 +170,10 @@ def output_parse(output):
     global host_set
     global seen_before
     global inventory
-    matches = re.findall(r'Device ID: (\S+)\r*\nIP address: (\S+)\r*\nPlatform: cisco (WS-\S+,)',device_output)
+    matches = re.findall(r'Device ID:(\S+)\r*\n'
+                         r'.*\r*\n\r*\nInterface address\(es\):\r*\n\+'
+                         r'IP(?:v4)* [Aa]ddress: (\S+)\r*\n'
+                         r'Platform: (\S+), Capabilities: (?:Switch|Router).*\r*\n',output)
     for match in matches:
         inventory.add(matches)
         if match[1] not in seen_before:
