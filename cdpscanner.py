@@ -122,7 +122,7 @@ def telnet_getinfo(username,password, host, commands):
     tn.write('exit\r\n')
     output = tn.read_all()
     with open(outputfile, 'wb') as outfile:
-        outfile.write(output)
+        outputfile.write(output)
     if verbose_mode == True:
         print output
     tn.close()
@@ -163,8 +163,7 @@ def ssh_getinfo(username,password,host,commands):
     if verbose_mode == True:
         print output
     with open(host+'.txt','w') as outputfile:
-        for line in output:
-            outputfile.write(line)
+        outputfile.write(output)
     return output
 def output_parse(output):
     global host_set
@@ -198,7 +197,7 @@ if __name__ == '__main__':
     inventory_enabled = False
     failed_telnet = []
     failed_ssh = []
-    cdp_regex = re.compile(r'Device ID: *(\S+)\r\n(?:.*\r\n){3}\ +IP(?:v4)* [aA]ddress:\ (\S+)\r\nPlatform: (?:cisco )*(\S+), Capabilities.*(Switch|Router)')
+    cdp_regex = re.compile(r'Device ID:[\ ]*(\S+)(?:[^\r\n]*\r?\n){1,3}[\ ]*+IP(?:v4)* [aA]ddress:\ (\S+)\r?\nPlatform: (?:cisco )*(\S+),[\ ]*Capabilities:.*(Switch|Router)')
     # Default commamnds if none are specififed in the CLI arguments
     commands = ['show cdp neighbor detail',
                 'show inventory']
