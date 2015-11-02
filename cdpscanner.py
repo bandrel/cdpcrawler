@@ -170,12 +170,10 @@ def output_parse(output):
     global host_set
     global seen_before
     global inventory
-    matches = re.findall(r'Device ID:(\S+)\r*\n'
-                         r'.*\r*\n\r*\nInterface address\(es\):\r*\n\+'
-                         r'IP(?:v4)* [Aa]ddress: (\S+)\r*\n'
-                         r'Platform: (\S+), Capabilities: (?:Switch|Router).*\r*\n',output)
+    output_as_string = '\r\n'.join(output)
+    matches = re.findall(cdp_regex,output_as_string)
     for match in matches:
-        inventory.add(matches)
+        inventory.append(matches)
         if match[1] not in seen_before:
             host_set.add(match[1])
             seen_before.add(match[1])
@@ -196,9 +194,11 @@ if __name__ == '__main__':
     current_set = set(host_set)
     seen_before = set()
     device = []
-    inventory = set()
+    inventory = []
     inventory_enabled = False
-
+    failed_telnet = []
+    failed_ssh = []
+    cdp_regex = re.compile(r'Device ID: (\S+)\r\nEntry address\(es\): \r\n  IP address: (\S+)\r\nPlatform: cisco (\S+),  Capabilities: (Switch|Router).*')
     # Default commamnds if none are specififed in the CLI arguments
     commands = ['show cdp neighbor detail',
                 'show inventory']
@@ -213,22 +213,23 @@ if __name__ == '__main__':
         for host in current_set:
                 # remove the host you are going to connect to from the set.
             currenthost = host_set.pop()
+            device_output = ''
             try:
                 # Try SSH and if that fails try telnet.
                 device_output = ssh_getinfo(username,password,currenthost,commands).split('\r\n')
                 # Check output for new hostnames
-                output_parse(device_output)
             except:
+                failed_ssh.append(host)
                 if telnet_disabled is not True:
                     try:
                         device_output = telnet_getinfo(username,password,currenthost,commands)
-                        output_parse(device_output)
                     except:
-                        # If both ssh and telnet fail add to a failed_hosts list
-                        failed_hosts.add(currenthost.upper())
+                        failed_telnet.append(host)
                 else:
-                 # If both ssh fails and telnet is disabled add to a failed_hosts list
-                    failed_hosts.add(currenthost.upper())
+                    pass
+            finally:
+                output_parse(device_output)
+
         # Update the current list with the most recent updated host_set.
         current_set = set(host_set)
 
