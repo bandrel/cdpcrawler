@@ -15,7 +15,7 @@ import glob
 
 #help message
 def helpmsg():
-    print 'Usage: cdpscanner.py [Options]' \
+    print 'Usage: cdpscanner.py [Options] <IP address or Host(optional)>' \
           '  Note: All options are optional.  User is prompted or defaults are used.' \
           '  -h or --help:  This help screen\n' \
           '  -i or --inputfile: specifies a file containing hosts to connect to.\n' \
@@ -92,6 +92,17 @@ def cli_parser():
                 helpmsg()
                 print e
                 sys.exit()
+    for arg in args:
+        try:
+            socket.inet_aton(arg)
+            host_set.add(arg)
+        except:
+            try:
+                ip_from_host = socket.gethostbyname(arg)
+                host_set.add(ip_from_host)
+            except:
+                print "%s is not a valid host name or IP address" % arg
+                sys.exit(2)
     #Set list of IP addreses to connect to if the -i input file is not used
     if host_set == []:
         host_set.append(raw_input("Enter Switch Hostname or IP Address: ").upper())
@@ -122,7 +133,7 @@ def telnet_getinfo(username,password, host, commands):
     tn.write('exit\r\n')
     output = tn.read_all()
     with open(outputfile, 'wb') as outfile:
-        outputfile.write(output)
+        outfile.write(output)
     if verbose_mode == True:
         print output
     tn.close()
