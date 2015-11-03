@@ -228,11 +228,13 @@ if __name__ == '__main__':
                 device_output = ssh_getinfo(username,password,currenthost,commands)
                 # Check output for new hostnames
             except:
+                print "SSH connection to %s failed" % host
                 failed_ssh.append(host)
                 if telnet_disabled is not True:
                     try:
                         device_output = telnet_getinfo(username,password,currenthost,commands)
                     except:
+                        print "telnet connection to %s failed" % host
                         failed_telnet.append(host)
                 else:
                     pass
