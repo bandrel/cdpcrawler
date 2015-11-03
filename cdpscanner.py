@@ -11,7 +11,7 @@ import getopt
 import sys
 import os
 import re
-import socket
+import glob
 
 #help message
 def helpmsg():
@@ -38,6 +38,7 @@ def cli_parser():
     global host_set
     global inventory_enabled
     import getpass
+    import socket
     try:
         opts, args = getopt.getopt(sys.argv[1:],"i:u:p:c:hd:vt",["input=", "user=", "password=", "commands=",
                                                                  "directory=","verbose","disable-telnet","inventory"])
@@ -53,16 +54,15 @@ def cli_parser():
             with open(org_dir+'/'+inputfile, 'rb') as hostfile:
                 for device in hostfile:
                     try:
-                        socket.inet_aton(device)
-                        host_set.add(device)
+                        socket.inet_aton(device.rstrip('\r\n'))
+                        host_set.add(device.rstrip('\r\n'))
                     except:
                         try:
-                            dns_name,empty,ip_from_host = socket.gethostbyaddr(device.rstrip('\r\n'))
-                            host_set.add(ip_from_host[0])
-                        except socket.gaierror:
+                            ip_from_host = socket.gethostbyname(device.rstrip('\r\n'))
+                            host_set.add(ip_from_host)
+                        except:
                             print "%s is not a valid host name or IP address" % device
-                        except socket.herror:
-                            print "%s is not a valid host name or IP address" % device
+                            sys.exit(2)
         elif opt in ('-t', '--disable-telnet'):
             telnet_disabled = True
         elif opt in ('-v', '--verbose'):
@@ -122,7 +122,7 @@ def telnet_getinfo(username,password, host, commands):
     tn.write('exit\r\n')
     output = tn.read_all()
     with open(outputfile, 'wb') as outfile:
-        outfile.write(output)
+        outputfile.write(output)
     if verbose_mode == True:
         print output
     tn.close()
@@ -147,7 +147,7 @@ def ssh_getinfo(username,password,host,commands):
     remote_conn = remote_conn_pre.invoke_shell()
     print "Interactive SSH session established"
     # Strip the initial router prompt
-    output = remote_conn.recv(1000)
+    output = remote_conn.recv(5000)
     # See what we have
     if verbose_mode == True:
         print output
@@ -159,23 +159,23 @@ def ssh_getinfo(username,password,host,commands):
         remote_conn.send(command+'\n')
     # Wait for the command to complete
     time.sleep(3)
-    output = remote_conn.recv(10000)
+    output = remote_conn.recv(100000)
     if verbose_mode == True:
         print output
-    with open(host+'.txt','w') as outputfile:
-        for line in output:
-            outputfile.write(line)
+    with open(host+'.txt','wb') as outputfile:
+        outputfile.write(output)
     return output
 def output_parse(output):
     global host_set
     global seen_before
-    global inventory
-    matches = re.findall(r'Device ID: (\S+)\r*\nIP address: (\S+)\r*\nPlatform: cisco (WS-\S+,)',device_output)
-    for match in matches:
-        inventory.add(matches)
-        if match[1] not in seen_before:
-            host_set.add(match[1])
-            seen_before.add(match[1])
+    cdp_regex = re.compile(r'\ *(\S+)(?:[^\r\n]*\r?\n){1,4}[\ ]*IP(?:v4)* [aA]ddress:\ (\S+)\r?\nPlatform: (?:cisco )*(\S+),[\ ]*Capabilities:.*(Switch)')
+    split_output = output.split('Device ID:')
+    for single_device in split_output:
+        matches = re.findall(cdp_regex,single_device)
+        for match in matches:
+            if match[1] not in seen_before:
+                host_set.add(match[1])
+                seen_before.add(match[1])
 
 if __name__ == '__main__':
     #Declaration of global variables
@@ -193,9 +193,10 @@ if __name__ == '__main__':
     current_set = set(host_set)
     seen_before = set()
     device = []
-    inventory = set()
+    inventory = []
     inventory_enabled = False
-
+    failed_telnet = []
+    failed_ssh = []
     # Default commamnds if none are specififed in the CLI arguments
     commands = ['show cdp neighbor detail',
                 'show inventory']
@@ -210,27 +211,36 @@ if __name__ == '__main__':
         for host in current_set:
                 # remove the host you are going to connect to from the set.
             currenthost = host_set.pop()
+            device_output = ''
             try:
                 # Try SSH and if that fails try telnet.
-                device_output = ssh_getinfo(username,password,currenthost,commands).split('\r\n')
+                device_output = ssh_getinfo(username,password,currenthost,commands)
                 # Check output for new hostnames
-                output_parse(device_output)
             except:
+                failed_ssh.append(host)
                 if telnet_disabled is not True:
                     try:
                         device_output = telnet_getinfo(username,password,currenthost,commands)
-                        output_parse(device_output)
                     except:
-                        # If both ssh and telnet fail add to a failed_hosts list
-                        failed_hosts.add(currenthost.upper())
+                        failed_telnet.append(host)
                 else:
-                 # If both ssh fails and telnet is disabled add to a failed_hosts list
-                    failed_hosts.add(currenthost.upper())
+                    pass
+            finally:
+                output_parse(device_output)
+
         # Update the current list with the most recent updated host_set.
         current_set = set(host_set)
 
     #After everything has been completed or removed
     if inventory_enabled == True:
-        print inventory
+        devices = glob.glob('*.txt')
+        for device in devices:
+            with open(device) as dfile:
+                for line in dfile:
+                    matches = re.findall(r'PID:\ *(\S+),.*SN:(\S+)',line)
+                    if matches != []:
+                        inventory.append([host,matches[0],matches[1]])
+
+
     for line in failed_hosts:
         print '[!] %s failed both ssh and telnet' % line
