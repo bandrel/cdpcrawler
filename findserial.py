@@ -52,12 +52,12 @@ host_set = set(hostnames)
 if args == []:
     if site is '':
         for hostname in host_set:
-            print(hostname)
+            print(hostname).rstrip()
     else:
         for hostname in host_set:
             sitecode = hostname[0:3]
             if sitecode.upper() == site.upper():
-                print hostname
+                print hostname.rstrip()
 else:
     if site is '':
         with open(args[0],'wb') as x:
