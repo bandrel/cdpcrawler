@@ -49,17 +49,30 @@ for file in glob.glob('*.txt'):
                 hostnames.append(host+','+s.group(1)+','+s.group(2)+'\n')
 
 host_set = set(hostnames)
-if site is '':
-    with open(args[0],'wb') as x:
-        x.write('Hostname,PID,Serial Number\n')
+if args == []:
+    if site is '':
         for hostname in host_set:
-            x.write(hostname)
-
+            print(hostname)
+    else:
+        for hostname in host_set:
+            sitecode = hostname[0:3]
+            if sitecode.upper() == site.upper():
+                print hostname
 else:
-    for hostname in host_set:
-        sitecode = hostname[0:3]
-        if sitecode.upper() == site.upper():
-            print hostname
+    if site is '':
+        with open(args[0],'wb') as x:
+            x.write('Hostname,PID,Serial Number\n')
+            for hostname in host_set:
+                x.write(hostname)
+
+    else:
+        for hostname in host_set:
+            sitecode = hostname[0:3]
+            with open(args[0],'wb') as x:
+                x.write('Hostname,PID,Serial Number\n')
+                for hostname in host_set:
+                    if sitecode.upper() == site.upper():
+                        x.write(hostname)
 
 
 
