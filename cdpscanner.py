@@ -74,7 +74,6 @@ def cli_parser():
         elif opt in ('--inventory'):
             inventory_enabled = True
         elif opt in ('-c', '--commands'):
-            commands = []
             try:
                 with open(org_dir+'/'+arg, 'rb') as commandfile:
                     for line in commandfile:
@@ -208,7 +207,7 @@ if __name__ == '__main__':
     inventory_enabled = False
     failed_telnet = []
     failed_ssh = []
-    # Default commamnds if none are specififed in the CLI arguments
+    # Default commamnds if no additional commands are specififed in the CLI arguments
     commands = ['show cdp neighbor detail',
                 'show inventory']
 
