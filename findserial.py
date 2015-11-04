@@ -42,16 +42,17 @@ for file in glob.glob('*.txt'):
     with open(file) as switch_output:
         for line in switch_output:
             h = re.search(r'^(\S+)[#>]',line)
-            s = re.search(r'(WS-C\S+).*SN: (\S+)',line)
+            s = re.search(r'(WS-C(?!(?:AC-4000W-US|6K-VTT-E|6509-E-FAN))\S+).*SN: (\S+)',line)
             if h is not None:
                 host = h.group(1)
             if s is not None:
-                hostnames.append(host+'\t'+s.group(1)+'\t'+s.group(2))
+                hostnames.append(host+','+s.group(1)+','+s.group(2)+'\n')
 
 host_set = set(hostnames)
 if site is '':
-    for hostname in host_set:
-        print hostname
+    with open(args[0],'wb') as x:
+        for hostname in host_set:
+            x.write(hostname)
 
 else:
     for hostname in host_set:
