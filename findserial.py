@@ -51,6 +51,7 @@ for file in glob.glob('*.txt'):
 host_set = set(hostnames)
 if site is '':
     with open(args[0],'wb') as x:
+        x.write('Hostname,PID,Serial Number\n')
         for hostname in host_set:
             x.write(hostname)
 
