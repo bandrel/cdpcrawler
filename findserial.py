@@ -3,8 +3,6 @@ import re
 import getopt
 import sys
 import os
-import socket
-
 
 verbose = False
 directory = ''
