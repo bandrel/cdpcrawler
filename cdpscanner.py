@@ -1,3 +1,5 @@
+
+import os
 try:
     import paramiko
 except:
@@ -9,7 +11,6 @@ except:
 import time
 import getopt
 import sys
-import os
 import re
 import glob
 
