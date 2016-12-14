@@ -66,7 +66,8 @@ def telnet_getinfo(username,password, host, commands):
 
 def ssh_getinfo(username,password,host,commands):
     global ws
-    all_output = ''
+    all_output = []
+    row = []
     device = {
         'device_type': 'cisco_ios',
         'ip'         : host,
@@ -90,31 +91,32 @@ def ssh_getinfo(username,password,host,commands):
         hostname = host
     for command in commands:
         output = net_connect.send_command(command)
-        all_output += output
+        all_output.append(output)
         if command == 'show inventory':
             lines = output.split('\n\n')
             for line in lines:
                 new_line = line.replace('\n','')
                 a = re.search(r'NAME:\ ?(\S+).*PID:\ ?(\S+).*SN:\ ?(\S+)',new_line)
                 if a is not None:
-                    hostname = a.group(1)
                     pid = a.group(2)
                     serial = a.group(3)
+                    row.append([hostname,pid,serial])
         if verbose_mode:
             print(output)
-    return all_output, [hostname,pid,serial]
+    return all_output, row
 
 def find_hosts_from_output(output):
     global host_set
     global seen_before
     cdp_regex = re.compile(r'\ *(\S+)(?:[^\r\n]*\r?\n){1,4}[\ ]*IP(?:v4)* [aA]ddress:\ (\S+)\r?\nPlatform: (?:cisco )*(\S+),[\ ]*Capabilities:.*(Switch)')
-    split_output = output.split('Device ID:')
-    for single_device in split_output:
-        matches = re.findall(cdp_regex,single_device)
-        for match in matches:
-            if match[1] not in seen_before:
-                host_set.add(match[1])
-                seen_before.add(match[1])
+    for item in output:
+        split_output = item.split('Device ID:')
+        for single_device in split_output:
+            matches = re.findall(cdp_regex,single_device)
+            for match in matches:
+                if match[1] not in seen_before:
+                    host_set.add(match[1])
+                    seen_before.add(match[1])
 
 
 #Declaration of global variables
@@ -234,8 +236,9 @@ while host_set != set([]):
         device_output = ''
         try:
             # Try SSH and if that fails try telnet.
-            device_output, inventory_row = ssh_getinfo(username,password,currenthost,commands)
-            ws.append(inventory_row)
+            device_output, inventory_rows = ssh_getinfo(username, password, currenthost, commands)
+            for row in inventory_rows:
+                ws.append(row)
             # Check output for new hostnames
         except Exception as e:
             print("SSH connection to %s failed" % host)
@@ -268,5 +271,5 @@ if inventory_enabled == True:
 
 for line in failed_hosts:
     print '[!] %s failed both ssh and telnet' % line
-
+wb.remove_sheet('Sheet')
 wb.save(outputfile)
