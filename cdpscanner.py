@@ -3,11 +3,11 @@ import os
 try:
     from netmiko import ConnectHandler
 except:
-    print '[!] Looks like you are missing the paramiko library.  run \'pip install netmiko\''
+    print('[!] Looks like you are missing the paramiko library.  run \'pip install netmiko\'')
     if os.name == 'nt':
-        print '[!] *NOTE* you must install the Microsoft Visual C++ Compiler for Python 2.7 ' \
+        print('[!] *NOTE* you must install the Microsoft Visual C++ Compiler for Python 2.7 ' \
               'before installing netmiko.\r\n'\
-              'This can be found at http://www.microsoft.com/en-us/download/details.aspx?id=44266'
+              'This can be found at http://www.microsoft.com/en-us/download/details.aspx?id=44266')
 import getopt
 import sys
 import re
@@ -18,7 +18,7 @@ from openpyxl import Workbook
 
 #help message
 def helpmsg():
-    print 'Usage: cdpscanner.py [Options] <IP address or Host(optional)>' \
+    print('Usage: cdpscanner.py [Options] <IP address or Host(optional)>' \
           '  Note: All options are optional.  User is prompted or defaults are used.' \
           '  -h or --help:  This help screen\n' \
           '  -i or --inputfile: specifies a file containing hosts to connect to.\n' \
@@ -30,7 +30,7 @@ def helpmsg():
           '  -d or --directory: Specifies a a directory to place the output files into\n'\
           '  --inventory:  Prints the inventory of all of the devices at the end\n'\
           '  -o or --output:  Prints the inventory of all of the devices at the end\n'\
-          '  -H or --hosts:  specifies hosts via comma seperated values\n'
+          '  -H or --hosts:  specifies hosts via comma seperated values\n')
 
 
 
@@ -231,7 +231,7 @@ while host_set != set([]):
                 try:
                     device_output, inventory_rows = getinfo(username, password, currenthost, commands, 'Telnet')
                 except Exception as e:
-                    print "telnet connection to %s failed" % host
+                    print("telnet connection to %s failed" % host)
                     failed_telnet.append(host)
                     errors_ws.append([host, unicode(e), 'telnet'])
             else:
@@ -256,5 +256,5 @@ if inventory_enabled == True:
 
 
 for line in failed_hosts:
-    print '[!] %s failed both ssh and telnet' % line
+    print('[!] %s failed both ssh and telnet' % line)
 wb.save(outputfile)
