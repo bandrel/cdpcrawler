@@ -38,11 +38,11 @@ def telnet_getinfo(username,password, host, commands):
     outputfile = str(host)+ '.txt'
     tn = telnetlib.Telnet(host)
     print "telnet connection established to %s" % host
-    tn.expect(['((\r*\n)+User Access Verification(\r*\n)+)*[Uu]sername: '],timeout=5)
+    tn.expect(['((\r*\n)+User Access Verification(\r*\n)+)*[Uu]sername: '],timeout=10)
     tn.write(username + '\r\n')
     tn.expect(['[Pp]assword: '])
     tn.write(password + '\r\n')
-    enable_prompt = tn.expect([r'>$'],timeout=1)
+    enable_prompt = tn.expect([r'>$'],timeout=3)
     if enable_prompt[1] == None:
         pass
     else:
