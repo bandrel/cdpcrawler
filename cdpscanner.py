@@ -7,7 +7,6 @@ except:
         print '[!] *NOTE* you must install the Microsoft Visual C++ Compiler for Python 2.7 ' \
               'before installing paramiko.\r\n'\
               'This can be found at http://www.microsoft.com/en-us/download/details.aspx?id=44266'
-import time
 import getopt
 import sys
 import re
@@ -16,9 +15,6 @@ import getpass
 import socket
 
 from openpyxl import Workbook
-from openpyxl.writer.write_only import WriteOnlyCell
-from openpyxl.comments import Comment
-from openpyxl.styles import Font
 
 #help message
 def helpmsg():
