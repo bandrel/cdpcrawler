@@ -6,7 +6,7 @@ except:
     print '[!] Looks like you are missing the paramiko library.  run \'pip install netmiko\''
     if os.name == 'nt':
         print '[!] *NOTE* you must install the Microsoft Visual C++ Compiler for Python 2.7 ' \
-              'before installing paramiko.\r\n'\
+              'before installing netmiko.\r\n'\
               'This can be found at http://www.microsoft.com/en-us/download/details.aspx?id=44266'
 import getopt
 import sys
