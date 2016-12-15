@@ -26,11 +26,8 @@ def helpmsg():
           '  -i or --inputfile: specifies a file containing hosts to connect to.\n' \
           '  -u or --username: specifies a username to use\n' \
           '  -p or --password: Specifies the password to use\n' \
-          '  -c or --commands: Specifies a list of commands to send\n' \
           '  -v or --verbose: Enables verbose output\n' \
           '  -t or --telnet:  Enables fallback to telnet\n' \
-          '  -d or --directory: Specifies a a directory to place the output files into\n' \
-          '  --inventory:  Prints the inventory of all of the devices at the end\n' \
           '  -o or --output:  Prints the inventory of all of the devices at the end\n' \
           '  -H or --hosts:  specifies hosts via comma seperated values\n')
 
@@ -85,24 +82,36 @@ def getinfo(username, password, host, commands, mode):
             print(output)
     return all_output, row
 
+def validate_host(host):
+    try:
+        socket.inet_aton(host)
+        return True
+    except:
+        try:
+            ip_from_host = socket.gethostbyname(device)
+            return True
+        except:
+            print("%s is not a valid host name or IP address" % device)
+            sys.exit(2)
 
 def find_hosts_from_output(output):
     neighbor_list = []
     global host_set
     global seen_before
     cdp_regex = re.compile(
-        r'\ *(\S+)(?:[^\r\n]*\r?\n){1,4}'
+        r'Device ID:\ *(\S+)(?:[^\r\n]*\r?\n){1,4}'
         r'[\ ]*IP(?:v4)* [aA]ddress:\ (\S+)\r?\n'
         r'Platform: (?:cisco )*(\S+),[\ ]*Capabilities:.*(Switch)')
     for item in output:
-        split_output = item.split('Device ID:')
+        split_output = ['Device ID:'+ e for e in item.split('Device ID:') if e != '']
         for single_device in split_output:
-            matches = re.findall(cdp_regex, single_device)
-            for match in matches:
-                if match[1] not in seen_before:
-                    host_set.add(match[1])
-                    seen_before.add(match[1])
-                neighbor_list.append([match[0], match[1], match[2]])
+            matches = re.search(cdp_regex, single_device)
+            if matches is not None:
+                if matches.group(1) not in seen_before or matches.group(2) not in seen_before:
+                    host_set.add(matches.group(2))
+                    seen_before.add(matches.group(1))
+                    seen_before.add(matches.group(2))
+                neighbor_list.append([matches.group(1), matches.group(2), matches.group(3)])
     return neighbor_list
 
 
@@ -112,20 +121,14 @@ host_set = set()
 username = ''
 password = ''
 failed_hosts = set()
-TIMEOUT = 30
-org_dir = os.curdir
-working_directory = os.curdir
 verbose_mode = False
 telnet_enabled = False
 current_set = set(host_set)
 seen_before = set()
 device = []
-inventory = []
-inventory_enabled = False
 failed_telnet = []
 failed_ssh = []
 outputfile = 'output.xlsx'
-# Default commamnds if no additional commands are specififed in the CLI arguments
 commands = ['show cdp neighbor detail',
             'show inventory']
 
@@ -142,9 +145,8 @@ errors_ws.append(['Hostname', 'Error', 'Protocol'])
 
 # Run CLI parser function to set variables altered from defaults by CLI arguments.
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hd:vtH:o:",
-                               ["input=", "user=", "password=", "directory=", "verbose", "telnet",
-                                "hosts=", "output="])
+    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hvtH:o:",
+                               ["input=", "user=", "password=", "verbose", "telnet","hosts=", "output="])
 except getopt.GetoptError:
     helpmsg()
     sys.exit(2)
@@ -154,18 +156,11 @@ for opt, arg in opts:
         sys.exit()
     elif opt in ('-i', '--input'):
         inputfile = arg
-        with open(org_dir + '/' + inputfile, 'rb') as hostfile:
-            for device in hostfile:
-                try:
-                    socket.inet_aton(device.rstrip())
-                    host_set.add(device.rstrip())
-                except:
-                    try:
-                        ip_from_host = socket.gethostbyname(device.rstrip())
-                        host_set.add(ip_from_host)
-                    except:
-                        print("%s is not a valid host name or IP address" % device)
-                        sys.exit(2)
+        with open(inputfile, 'rb') as hostfile:
+            for line in hostfile:
+                device = line.rstrip()
+                validate_host(device)
+                host_set.add(device)
     elif opt in ('-t', '--telnet'):
         telnet_enabled = True
     elif opt in ('-v', '--verbose'):
@@ -179,15 +174,6 @@ for opt, arg in opts:
     elif opt in ('-H', '--hosts'):
         for i in arg.split(','):
             host_set.add(i)
-for opt, arg in opts:
-    if opt in ('-d', '--directory'):
-        working_directory = arg
-        try:
-            os.chdir(working_directory)
-        except Exception as e:
-            helpmsg()
-            print(e)
-            sys.exit()
 
 # Set list of IP addreses to connect to if the -i input file is not used
 if not host_set:
