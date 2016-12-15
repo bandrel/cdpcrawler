@@ -61,7 +61,6 @@ def telnet_getinfo(username,password, host, commands):
 
 
 def ssh_getinfo(username,password,host,commands):
-    global inventory_ws
     all_output = []
     row = []
     device = {
