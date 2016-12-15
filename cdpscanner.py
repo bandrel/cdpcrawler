@@ -61,7 +61,7 @@ def telnet_getinfo(username,password, host, commands):
 
 
 def ssh_getinfo(username,password,host,commands):
-    global ws
+    global inventory_ws
     all_output = []
     row = []
     device = {
@@ -102,6 +102,7 @@ def ssh_getinfo(username,password,host,commands):
     return all_output, row
 
 def find_hosts_from_output(output):
+    neighbor_list = []
     global host_set
     global seen_before
     cdp_regex = re.compile(r'\ *(\S+)(?:[^\r\n]*\r?\n){1,4}[\ ]*IP(?:v4)* [aA]ddress:\ (\S+)\r?\nPlatform: (?:cisco )*(\S+),[\ ]*Capabilities:.*(Switch)')
@@ -113,6 +114,8 @@ def find_hosts_from_output(output):
                 if match[1] not in seen_before:
                     host_set.add(match[1])
                     seen_before.add(match[1])
+                neighbor_list.append([match[0],match[1],match[2]])
+    return neighbor_list
 
 
 #Declaration of global variables
@@ -138,9 +141,14 @@ outputfile = 'output.xlsx'
 commands = ['show cdp neighbor detail',
             'show inventory']
 
+#setup excel workbook for output
 wb = Workbook()
-ws = wb.create_sheet("Inventory")
-ws.append(['Hostname','Device Model','Serial Number'])
+inventory_ws = wb.create_sheet("Inventory")
+neighbor_ws = wb.create_sheet("Neighbors")
+#Add headers to worksheets
+inventory_ws.append(['Hostname', 'Device Model', 'Serial Number'])
+neighbor_ws.append(['Hostname', 'Neighbor Hostname', 'Neighbor IP', 'Neighbor Model'])
+
 
 
 # Run CLI parser function to set variables altered from defaults by CLI arguments.
@@ -234,7 +242,7 @@ while host_set != set([]):
             # Try SSH and if that fails try telnet.
             device_output, inventory_rows = ssh_getinfo(username, password, currenthost, commands)
             for row in inventory_rows:
-                ws.append(row)
+                inventory_ws.append(row)
             # Check output for new hostnames
         except Exception as e:
             print("SSH connection to %s failed" % host)
@@ -249,7 +257,9 @@ while host_set != set([]):
             else:
                 pass
         finally:
-            find_hosts_from_output(device_output)
+            neighbor_list = find_hosts_from_output(device_output)
+            for neighbor in neighbor_list:
+                neighbor_ws.append([host,neighbor[0],neighbor[1],neighbor[2]])
 
     # Update the current list with the most recent updated host_set.
     current_set = set(host_set)
@@ -267,5 +277,4 @@ if inventory_enabled == True:
 
 for line in failed_hosts:
     print '[!] %s failed both ssh and telnet' % line
-wb.remove_sheet('Sheet')
 wb.save(outputfile)
