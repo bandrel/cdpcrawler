@@ -3,7 +3,7 @@ import os
 
 try:
     from netmiko import ConnectHandler
-except:
+except ImportError:
     print('[!] Looks like you are missing the paramiko library.  run \'pip install netmiko\'')
     if os.name == 'nt':
         print('[!] *NOTE* you must install the Microsoft Visual C++ Compiler for Python 2.7 ' \
@@ -157,11 +157,11 @@ for opt, arg in opts:
         with open(org_dir + '/' + inputfile, 'rb') as hostfile:
             for device in hostfile:
                 try:
-                    socket.inet_aton(device.rstrip('\r\n'))
-                    host_set.add(device.rstrip('\r\n'))
+                    socket.inet_aton(device.rstrip())
+                    host_set.add(device.rstrip())
                 except:
                     try:
-                        ip_from_host = socket.gethostbyname(device.rstrip('\r\n'))
+                        ip_from_host = socket.gethostbyname(device.rstrip())
                         host_set.add(ip_from_host)
                     except:
                         print("%s is not a valid host name or IP address" % device)
