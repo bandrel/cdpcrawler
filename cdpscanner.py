@@ -13,7 +13,6 @@ import re
 import glob
 import getpass
 import socket
-import telnetlib
 from openpyxl import Workbook
 
 #help message
@@ -32,62 +31,38 @@ def helpmsg():
           '  -o or --output:  Prints the inventory of all of the devices at the end\n'\
           '  -H or --hosts:  specifies hosts via comma seperated values\n'
 
-def telnet_getinfo(username,password, host, commands):
+
+
+
+def getinfo(username, password, host, commands, mode):
     all_output = []
     row = []
-    outputfile = str(host)+ '.txt'
-    tn = telnetlib.Telnet(host)
-    print "telnet connection established to %s" % host
-    tn.expect(['((\r*\n)+User Access Verification(\r*\n)+)*[Uu]sername: '],timeout=10)
-    tn.write(username + '\r\n')
-    tn.expect(['[Pp]assword: '])
-    tn.write(password + '\r\n')
-    enable_prompt = tn.expect([r'>$'],timeout=3)
-    if enable_prompt[1] == None:
-        pass
-    else:
-        tn.write('enable\r\n'+password+'\r\n')
-    tn.write('terminal length 0\r\n')
-    for command in commands:
-        tn.write(command + '\r\n')
-        output = tn.read_all()
-        if verbose_mode == True:
-            print output
-        all_output.append(output)
-        if command == 'show inventory':
-            lines = output.split('\n\n')
-            for line in lines:
-                new_line = line.replace('\n','')
-                a = re.search(r'NAME:\ ?(\S+).*PID:\ ?(\S+).*SN:\ ?(\S+)',new_line)
-                if a is not None:
-                    pid = a.group(2)
-                    serial = a.group(3)
-                    row.append([host,pid,serial])
-    tn.write('exit\r\n')
-    tn.close()
-    return all_output, row
-
-
-
-def ssh_getinfo(username,password,host,commands):
-    all_output = []
-    row = []
-    device = {
-        'device_type': 'cisco_ios',
-        'ip'         : host,
-        'username'   : username,
-        'password'   : password,
-        'port'       : 22,  # optional, defaults to 22
-        'secret'     : '',  # optional, defaults to ''
-        'verbose'    : False,  # optional, defaults to False
-    }
-    print "Connecting to " + host + "\r\n"
+    if mode == "SSH":
+        device = {
+            'device_type': 'cisco_ios',
+            'ip'         : host,
+            'username'   : username,
+            'password'   : password,
+            'port'       : 22,  # optional, defaults to 22
+            'secret'     : '',  # optional, defaults to ''
+            'verbose'    : False,  # optional, defaults to False
+        }
+    elif mode == "Telnet":
+        device = {
+            'device_type': 'cisco_ios_telnet',
+            'ip'         : host,
+            'username'   : username,
+            'password'   : password,
+            'port'       : 23,  # optional, defaults to 22
+            'secret'     : '',  # optional, defaults to ''
+            'verbose'    : False,  # optional, defaults to False
+        }
+    print('Connecting to %s with %s' % (host,mode) )
     # Create instance of SSHClient object
     net_connect = ConnectHandler(**device)
     # Automatically add untrusted hosts (make sure okay for security policy in your environment)
-    print "SSH connection established to %s" % host
+    print('%s connection established to %s' % (mode,host))
     # Use invoke_shell to establish an 'interactive session'
-    print "Interactive SSH session established"
     a = re.search(r'(.*)#',net_connect.find_prompt())
     if a is not None:
         hostname = a.group(1)
@@ -185,7 +160,7 @@ for opt, arg in opts:
                         ip_from_host = socket.gethostbyname(device.rstrip('\r\n'))
                         host_set.add(ip_from_host)
                     except:
-                        print "%s is not a valid host name or IP address" % device
+                        print("%s is not a valid host name or IP address" % device)
                         sys.exit(2)
     elif opt in ('-t', '--telnet'):
         telnet_enabled = True
@@ -209,7 +184,7 @@ for opt, arg in opts:
                     commands.append(line.rstrip())
         except Exception as e:
             helpmsg()
-            print e
+            print(e)
             sys.exit()
 for opt, arg in opts:
     if opt in ('-d', '--directory'):
@@ -218,7 +193,7 @@ for opt, arg in opts:
             os.chdir(working_directory)
         except Exception as e:
             helpmsg()
-            print e
+            print(e)
             sys.exit()
 for arg in args:
     try:
@@ -229,7 +204,7 @@ for arg in args:
             ip_from_host = socket.gethostbyname(arg)
             host_set.add(ip_from_host)
         except:
-            print "%s is not a valid host name or IP address" % arg
+            print("%s is not a valid host name or IP address" % arg)
             sys.exit(2)
 #Set list of IP addreses to connect to if the -i input file is not used
 if host_set == []:
@@ -250,7 +225,7 @@ while host_set != set([]):
         device_output = ''
         try:
             # Try SSH and if that fails try telnet.
-            device_output, inventory_rows = ssh_getinfo(username, password, currenthost, commands)
+            device_output, inventory_rows = getinfo(username, password, currenthost, commands,'SSH')
             for row in inventory_rows:
                 inventory_ws.append(row)
             # Check output for new hostnames
@@ -261,7 +236,7 @@ while host_set != set([]):
             errors_ws.append([host, unicode(e),'SSH'])
             if telnet_enabled:
                 try:
-                    device_output, inventory_rows = telnet_getinfo(username,password,currenthost,commands)
+                    device_output, inventory_rows = getinfo(username, password, currenthost, commands, 'Telnet')
                 except Exception as e:
                     print "telnet connection to %s failed" % host
                     failed_telnet.append(host)
