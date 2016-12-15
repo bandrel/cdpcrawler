@@ -261,7 +261,7 @@ while host_set != set([]):
             errors_ws.append([host, unicode(e),'SSH'])
             if telnet_enabled:
                 try:
-                    device_output = telnet_getinfo(username,password,currenthost,commands)
+                    device_output, inventory_rows = telnet_getinfo(username,password,currenthost,commands)
                 except:
                     print "telnet connection to %s failed" % host
                     failed_telnet.append(host)
