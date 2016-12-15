@@ -144,9 +144,11 @@ commands = ['show cdp neighbor detail',
 wb = Workbook()
 inventory_ws = wb.create_sheet("Inventory")
 neighbor_ws = wb.create_sheet("Neighbors")
+errors_ws = wb.create_sheet("Errors")
 #Add headers to worksheets
 inventory_ws.append(['Hostname', 'Device Model', 'Serial Number'])
 neighbor_ws.append(['Hostname', 'Neighbor Hostname', 'Neighbor IP', 'Neighbor Model'])
+errors_ws.append(['Hostname', 'Error','Protocol'])
 
 
 
@@ -247,12 +249,14 @@ while host_set != set([]):
             print("SSH connection to %s failed" % host)
             print(e)
             failed_ssh.append(host)
+            errors_ws.append([host, e,'SSH'])
             if telnet_enabled:
                 try:
                     device_output = telnet_getinfo(username,password,currenthost,commands)
                 except:
                     print "telnet connection to %s failed" % host
                     failed_telnet.append(host)
+                    errors_ws.append([host, e, 'telnet'])
             else:
                 pass
         finally:
