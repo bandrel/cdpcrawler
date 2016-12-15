@@ -139,8 +139,8 @@ errors_ws.append(['Hostname', 'Error', 'Protocol'])
 
 # Run CLI parser function to set variables altered from defaults by CLI arguments.
 try:
-    opts, args = getopt.getopt(sys.argv[1:],"i:u:p:c:hd:vtH:o:",
-                               ["input=", "user=", "password=", "commands=","directory=","verbose","telnet",
+    opts, args = getopt.getopt(sys.argv[1:],"i:u:p:hd:vtH:o:",
+                               ["input=", "user=", "password=","directory=","verbose","telnet",
                                 "inventory","hosts=","output="])
 except getopt.GetoptError:
     helpmsg()
@@ -178,15 +178,6 @@ for opt, arg in opts:
             host_set.add(i)
     elif opt in ('--inventory'):
         inventory_enabled = True
-    elif opt in ('-c', '--commands'):
-        try:
-            with open(org_dir+'/'+arg, 'rb') as commandfile:
-                for line in commandfile:
-                    commands.append(line.rstrip())
-        except Exception as e:
-            helpmsg()
-            print(e)
-            sys.exit()
 for opt, arg in opts:
     if opt in ('-d', '--directory'):
         working_directory = arg
