@@ -26,7 +26,7 @@ def helpmsg():
           '  -p or --password: Specifies the password to use\n' \
           '  -c or --commands: Specifies a list of commands to send\n' \
           '  -v or --verbose: Enables verbose output\n'\
-          '  -t or --disable-telnet:  Disables fallback to telnet\n' \
+          '  -t or --telnet:  Enables fallback to telnet\n'\
           '  -d or --directory: Specifies a a directory to place the output files into\n'\
           '  --inventory:  Prints the inventory of all of the devices at the end\n'\
           '  -o or --output:  Prints the inventory of all of the devices at the end\n'\
@@ -265,7 +265,7 @@ while host_set != set([]):
                 except:
                     print "telnet connection to %s failed" % host
                     failed_telnet.append(host)
-                    errors_ws.append([host, e, 'telnet'])
+                    errors_ws.append([host, unicode(e), 'telnet'])
             else:
                 pass
         finally:
