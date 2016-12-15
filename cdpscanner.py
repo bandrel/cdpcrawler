@@ -262,7 +262,7 @@ while host_set != set([]):
             if telnet_enabled:
                 try:
                     device_output, inventory_rows = telnet_getinfo(username,password,currenthost,commands)
-                except:
+                except Exception as e:
                     print "telnet connection to %s failed" % host
                     failed_telnet.append(host)
                     errors_ws.append([host, unicode(e), 'telnet'])
