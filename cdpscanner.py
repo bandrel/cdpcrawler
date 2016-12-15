@@ -126,13 +126,14 @@ commands = ['show cdp neighbor detail',
 
 #setup excel workbook for output
 wb = Workbook()
-inventory_ws = wb.create_sheet("Inventory")
+inventory_ws = wb.active
+inventory_ws.title = u'Inventory'
 neighbor_ws = wb.create_sheet("Neighbors")
 errors_ws = wb.create_sheet("Errors")
 #Add headers to worksheets
 inventory_ws.append(['Hostname', 'Device Model', 'Serial Number'])
 neighbor_ws.append(['Hostname', 'Neighbor Hostname', 'Neighbor IP', 'Neighbor Model'])
-errors_ws.append(['Hostname', 'Error','Protocol'])
+errors_ws.append(['Hostname', 'Error', 'Protocol'])
 
 
 
