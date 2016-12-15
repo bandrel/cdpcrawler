@@ -13,7 +13,7 @@ import re
 import glob
 import getpass
 import socket
-
+import telnetlib
 from openpyxl import Workbook
 
 #help message
@@ -33,7 +33,8 @@ def helpmsg():
           '  -H or --hosts:  specifies hosts via comma seperated values\n'
 
 def telnet_getinfo(username,password, host, commands):
-    import telnetlib
+    all_output = []
+    row = []
     outputfile = str(host)+ '.txt'
     tn = telnetlib.Telnet(host)
     print "telnet connection established to %s" % host
@@ -49,14 +50,22 @@ def telnet_getinfo(username,password, host, commands):
     tn.write('terminal length 0\r\n')
     for command in commands:
         tn.write(command + '\r\n')
+        output = tn.read_all()
+        if verbose_mode == True:
+            print output
+        all_output.append(output)
+        if command == 'show inventory':
+            lines = output.split('\n\n')
+            for line in lines:
+                new_line = line.replace('\n','')
+                a = re.search(r'NAME:\ ?(\S+).*PID:\ ?(\S+).*SN:\ ?(\S+)',new_line)
+                if a is not None:
+                    pid = a.group(2)
+                    serial = a.group(3)
+                    row.append([host,pid,serial])
     tn.write('exit\r\n')
-    output = tn.read_all()
-    with open(outputfile, 'wb') as outfile:
-        outfile.write(output)
-    if verbose_mode == True:
-        print output
     tn.close()
-    return output
+    return all_output, row
 
 
 
@@ -249,7 +258,7 @@ while host_set != set([]):
             print("SSH connection to %s failed" % host)
             print(e)
             failed_ssh.append(host)
-            errors_ws.append([host, e,'SSH'])
+            errors_ws.append([host, unicode(e),'SSH'])
             if telnet_enabled:
                 try:
                     device_output = telnet_getinfo(username,password,currenthost,commands)
