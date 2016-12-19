@@ -12,10 +12,22 @@ except ImportError:
 import getopt
 import sys
 import re
-import glob
 import getpass
 import socket
 from openpyxl import Workbook
+import threading
+import Queue
+
+class WorkerThread(threading.Thread):
+    def __init__(self, queue):
+        threading.Thread.__init__(self)
+        self.queue = queue
+
+    def run(self):
+        while True:
+            host = self.queue.get()
+            connect_to_device(host)
+            self.queue.task_done()
 
 
 # help message
@@ -29,10 +41,12 @@ def helpmsg():
           '  -v or --verbose: Enables verbose output\n' \
           '  -t or --telnet:  Enables fallback to telnet\n' \
           '  -o or --output:  Prints the inventory of all of the devices at the end\n' \
-          '  -H or --hosts:  specifies hosts via comma seperated values\n')
+          '  -H or --hosts:  specifies hosts via comma seperated values\n' \
+          '  -T or --threads:  specifices the number of threads (defaults to 8)\n')
 
 
 def getinfo(username, password, host, commands, mode):
+    global seen_before
     all_output = []
     row = []
     if mode == "SSH":
@@ -61,11 +75,14 @@ def getinfo(username, password, host, commands, mode):
     # Automatically add untrusted hosts (make sure okay for security policy in your environment)
     print('%s connection established to %s' % (mode, host))
     # Use invoke_shell to establish an 'interactive session'
-    a = re.search(r'(.*)#', net_connect.find_prompt())
-    if a is not None:
-        hostname = a.group(1)
-    else:
-        hostname = host
+    a = re.search(r'(.*)[#>]', net_connect.find_prompt())
+    hostname = a.group(1)
+    seen_before.append(hostname)
+    ip_lines = net_connect.send_command('show ip int brief | ex unass')
+    for line in ip_lines.split('\n'):
+        a = re.search(r'([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)', line)
+        if a is not None:
+            seen_before.append(a.group(1))
     for command in commands:
         output = net_connect.send_command(command)
         all_output.append(output)
@@ -96,7 +113,7 @@ def validate_host(host):
 
 def find_hosts_from_output(output):
     neighbor_list = []
-    global host_set
+    global queue
     global seen_before
     cdp_regex = re.compile(
         r'Device ID:\ *(\S+)(?:[^\r\n]*\r?\n){1,4}'
@@ -108,11 +125,54 @@ def find_hosts_from_output(output):
             matches = re.search(cdp_regex, single_device)
             if matches is not None:
                 if matches.group(1) not in seen_before or matches.group(2) not in seen_before:
-                    host_set.add(matches.group(2))
-                    seen_before.add(matches.group(1))
-                    seen_before.add(matches.group(2))
+                    queue.put(matches.group(2))
+                    seen_before.append(matches.group(1))
+                    seen_before.append(matches.group(2))
                 neighbor_list.append([matches.group(1), matches.group(2), matches.group(3)])
     return neighbor_list
+
+
+def connect_to_device(host):
+    global seen_before
+    global neighbor_list
+    global failed_ssh
+    global errors_ws
+    global inventory_list
+    # remove the host you are going to connect to from the set.
+    device_output = ''
+    seen_before.append(host)
+    try:
+        # Try SSH and if that fails try telnet.
+        device_output, inventory_rows = getinfo(username, password, host, commands, 'SSH')
+        neighbor_rows = find_hosts_from_output(device_output)
+        for neighbor in neighbor_rows:
+            neighbor.insert(0,unicode(inventory_rows[0][0]))
+            neighbor.insert(1,unicode(host))
+            neighbor_list.append(neighbor)
+
+            [inventory_list.append(row) for row in inventory_rows if row not in inventory_list]
+
+                # Check output for new hostnames
+    except Exception as e:
+        print("SSH connection to %s failed" % host)
+        print(e)
+        failed_ssh.append(host)
+        errors_ws.append([host, unicode(e), 'SSH'])
+        if telnet_enabled:
+            try:
+                device_output, inventory_rows = getinfo(username, password, host, commands, 'Telnet')
+                neighbor_rows = find_hosts_from_output(device_output)
+                for neighbor in neighbor_rows:
+                    neighbor.insert(0, unicode(inventory_rows[0][0]))
+                    neighbor.insert(1, unicode(host))
+                    neighbor_ws.append(neighbor)
+                    [inventory_list.append(row) for row in inventory_rows if row not in inventory_list]
+            except Exception as e:
+                print("telnet connection to %s failed" % host)
+                failed_telnet.append(host)
+                errors_ws.append([host, unicode(e), 'telnet'])
+        else:
+            pass
 
 
 # Declaration of global variables
@@ -123,15 +183,16 @@ password = ''
 failed_hosts = set()
 verbose_mode = False
 telnet_enabled = False
-current_set = set(host_set)
-seen_before = set()
+seen_before = []
 device = []
 failed_telnet = []
 failed_ssh = []
 outputfile = 'output.xlsx'
+inventory_list = []
+neighbor_list = []
 commands = ['show cdp neighbor detail',
             'show inventory']
-
+thread_num = 8
 # setup excel workbook for output
 wb = Workbook()
 inventory_ws = wb.active
@@ -139,14 +200,14 @@ inventory_ws.title = u'Inventory'
 neighbor_ws = wb.create_sheet("Neighbors")
 errors_ws = wb.create_sheet("Errors")
 # Add headers to worksheets
-inventory_ws.append(['Hostname', 'Device Model', 'Serial Number'])
-neighbor_ws.append(['Hostname', 'Neighbor Hostname', 'Neighbor IP', 'Neighbor Model'])
+inventory_list.append(['Hostname', 'Device Model', 'Serial Number'])
+neighbor_ws.append(['Hostname','IP Address', 'Neighbor Hostname', 'Neighbor IP', 'Neighbor Model'])
 errors_ws.append(['Hostname', 'Error', 'Protocol'])
 
 # Run CLI parser function to set variables altered from defaults by CLI arguments.
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hvtH:o:",
-                               ["input=", "user=", "password=", "verbose", "telnet","hosts=", "output="])
+    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hvtH:o:T:",
+                               ["input=", "user=", "password=", "verbose", "telnet","hosts=", "output=","threads="])
 except getopt.GetoptError:
     helpmsg()
     sys.exit(2)
@@ -163,6 +224,8 @@ for opt, arg in opts:
                 host_set.add(device)
     elif opt in ('-t', '--telnet'):
         telnet_enabled = True
+    elif opt in ('-T', '--threads'):
+        thread_num = arg
     elif opt in ('-v', '--verbose'):
         verbose_mode = True
     elif opt in ('-o', '--output'):
@@ -183,44 +246,22 @@ if username == '':
 if password == '':
     password = getpass.getpass()
 
-# Create a working copy of the set that contains all of the hosts.
+queue = Queue.Queue()
 
-# Create a loop to make crawler recursive
-while host_set != set([]):
-    # iterate through the set of hosts
-    for host in current_set:
-        # remove the host you are going to connect to from the set.
-        currenthost = host_set.pop()
-        device_output = ''
-        try:
-            # Try SSH and if that fails try telnet.
-            device_output, inventory_rows = getinfo(username, password, currenthost, commands, 'SSH')
-            for row in inventory_rows:
-                inventory_ws.append(row)
-                # Check output for new hostnames
-        except Exception as e:
-            print("SSH connection to %s failed" % host)
-            print(e)
-            failed_ssh.append(host)
-            errors_ws.append([host, unicode(e), 'SSH'])
-            if telnet_enabled:
-                try:
-                    device_output, inventory_rows = getinfo(username, password, currenthost, commands, 'Telnet')
-                except Exception as e:
-                    print("telnet connection to %s failed" % host)
-                    failed_telnet.append(host)
-                    errors_ws.append([host, unicode(e), 'telnet'])
-            else:
-                pass
-        finally:
-            neighbor_list = find_hosts_from_output(device_output)
-            for neighbor in neighbor_list:
-                neighbor_ws.append([host, neighbor[0], neighbor[1], neighbor[2]])
+for i in range(int(thread_num)):
+    worker = WorkerThread(queue)
+    worker.setDaemon(True)
+    worker.start()
 
-    # Update the current list with the most recent updated host_set.
-    current_set = set(host_set)
+for x in host_set:
+    queue.put(x)
+
+queue.join()
 
 for host in failed_ssh:
     if host in failed_telnet:
         print('[!] %s failed both ssh and telnet' % host)
+[inventory_ws.append(row) for row in inventory_list]
+[neighbor_ws.append(row) for row in neighbor_list]
+
 wb.save(outputfile)
