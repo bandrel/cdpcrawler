@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-
 try:
     from netmiko import ConnectHandler
 except ImportError:
@@ -124,11 +123,16 @@ def find_hosts_from_output(output):
         for single_device in split_output:
             matches = re.search(cdp_regex, single_device)
             if matches is not None:
-                if matches.group(1) not in seen_before or matches.group(2) not in seen_before:
+                hostname = matches.group(1).split('.')[0]
+                fqdn = matches.group(1)
+                ip_address = matches.group(2)
+                device_model = matches.group(3)
+                if hostname not in seen_before and ip_address not in seen_before and fqdn not in seen_before:
                     queue.put(matches.group(2))
-                    seen_before.append(matches.group(1))
-                    seen_before.append(matches.group(2))
-                neighbor_list.append([matches.group(1), matches.group(2), matches.group(3)])
+                    seen_before.append(hostname)
+                    seen_before.append(fqdn)
+                    seen_before.append(ip_address)
+                neighbor_list.append([hostname, ip_address, device_model])
     return neighbor_list
 
 
@@ -183,6 +187,7 @@ password = ''
 failed_hosts = set()
 verbose_mode = False
 telnet_enabled = False
+graph_output = ''
 seen_before = []
 device = []
 failed_telnet = []
@@ -206,8 +211,9 @@ errors_ws.append(['Hostname', 'Error', 'Protocol'])
 
 # Run CLI parser function to set variables altered from defaults by CLI arguments.
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hvtH:o:T:",
-                               ["input=", "user=", "password=", "verbose", "telnet","hosts=", "output=","threads="])
+    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hvtH:o:T:g:",
+                               ["input=", "user=", "password=", "verbose", "telnet","hosts=", "output=","threads=",
+                                "graph="])
 except getopt.GetoptError:
     helpmsg()
     sys.exit(2)
@@ -234,6 +240,9 @@ for opt, arg in opts:
         username = arg
     elif opt in ('-p', '--password'):
         password = arg
+    elif opt in ('-g', '--graph'):
+        from gengraph import creategraph
+        graph_output = arg
     elif opt in ('-H', '--hosts'):
         for i in arg.split(','):
             host_set.add(i)
@@ -261,7 +270,12 @@ queue.join()
 for host in failed_ssh:
     if host in failed_telnet:
         print('[!] %s failed both ssh and telnet' % host)
+inventory_dedupe = []
+[inventory_dedupe.append(i) for i in inventory_list if i not in inventory_dedupe]
 [inventory_ws.append(row) for row in inventory_list]
-[neighbor_ws.append(row) for row in neighbor_list]
-
+neighbor_dedupe = []
+[neighbor_dedupe.append(i) for i in neighbor_list if i not in neighbor_dedupe]
+[neighbor_ws.append(row) for row in neighbor_dedupe]
 wb.save(outputfile)
+if graph_output:
+    creategraph(outputfile,graph_output)
