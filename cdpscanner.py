@@ -41,7 +41,8 @@ def helpmsg():
           '  -t or --telnet:  Enables fallback to telnet\n' \
           '  -o or --output:  Prints the inventory of all of the devices at the end\n' \
           '  -H or --hosts:  specifies hosts via comma seperated values\n' \
-          '  -T or --threads:  specifices the number of threads (defaults to 8)\n')
+          '  -T or --threads:  specifices the number of threads (defaults to 8)\n'\
+          '  -g or --graph:  enables graphing of the network and specifices the output file\n')
 
 
 def getinfo(username, password, host, commands, mode):
