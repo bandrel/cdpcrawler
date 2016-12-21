@@ -250,10 +250,10 @@ for opt, arg in opts:
 
 # Set list of IP addreses to connect to if the -i input file is not used
 if not host_set:
-    host_set.append(raw_input("Enter Switch Hostname or IP Address: ").upper())
-if username == '':
+    host_set.add(raw_input("Enter Switch Hostname or IP Address: ").upper())
+if not username:
     username = raw_input("Enter Username: ")
-if password == '':
+if not password:
     password = getpass.getpass()
 
 queue = Queue.Queue()
