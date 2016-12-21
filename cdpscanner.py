@@ -31,7 +31,7 @@ class WorkerThread(threading.Thread):
 
 # help message
 def helpmsg():
-    print('Usage: cdpscanner.py [Options] <IP address or Host(optional)>' \
+    print('Usage: cdpscanner.py [Options]' \
           '  Note: All options are optional.  User is prompted or defaults are used.' \
           '  -h or --help:  This help screen\n' \
           '  -i or --inputfile: specifies a file containing hosts to connect to.\n' \
