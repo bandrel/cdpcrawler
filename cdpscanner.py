@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import os
+
+
 try:
     from netmiko import ConnectHandler
 except ImportError:
@@ -16,7 +18,7 @@ import socket
 from openpyxl import Workbook
 import threading
 import Queue
-
+import ipaddress
 class WorkerThread(threading.Thread):
     def __init__(self, queue):
         threading.Thread.__init__(self)
@@ -41,6 +43,7 @@ def helpmsg():
           '  -t or --telnet:  Enables fallback to telnet\n' \
           '  -o or --output:  Prints the inventory of all of the devices at the end\n' \
           '  -H or --hosts:  specifies hosts via comma seperated values\n' \
+          '  -e or --exclusions: specifies hosts/networks to exclude from scan via comma seperated values\n' \
           '  -T or --threads:  specifices the number of threads (defaults to 8)\n'\
           '  -g or --graph:  enables graphing of the network and specifices the output file\n')
 
@@ -128,7 +131,8 @@ def find_hosts_from_output(output):
                 fqdn = matches.group(1)
                 ip_address = matches.group(2)
                 device_model = matches.group(3)
-                if hostname not in seen_before and ip_address not in seen_before and fqdn not in seen_before:
+                if hostname not in seen_before and ip_address not in seen_before and fqdn not in seen_before and \
+                        ip_address not in excluded_devices:
                     queue.put(matches.group(2))
                     seen_before.append(hostname)
                     seen_before.append(fqdn)
@@ -199,6 +203,7 @@ neighbor_list = []
 commands = ['show cdp neighbor detail',
             'show inventory']
 thread_num = 8
+excluded_devices = []
 # setup excel workbook for output
 wb = Workbook()
 inventory_ws = wb.active
@@ -212,9 +217,9 @@ errors_ws.append(['Hostname', 'Error', 'Protocol'])
 
 # Run CLI parser function to set variables altered from defaults by CLI arguments.
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hvtH:o:T:g:",
+    opts, args = getopt.getopt(sys.argv[1:], "i:u:p:hvtH:o:T:g:e:",
                                ["input=", "user=", "password=", "verbose", "telnet","hosts=", "output=","threads=",
-                                "graph="])
+                                "graph=","exclusions="])
 except getopt.GetoptError:
     helpmsg()
     sys.exit(2)
@@ -247,6 +252,13 @@ for opt, arg in opts:
     elif opt in ('-H', '--hosts'):
         for i in arg.split(','):
             host_set.add(i)
+    elif opt in ('-e', '--exclusions'):
+        for i in arg.split(','):
+            network_address = ipaddress.IPv4Network(unicode(i))
+            if network_address.num_addresses > 1:
+                [excluded_devices.append(str(host)) for host in network_address.hosts()]
+            else:
+                excluded_devices.append(str(network_address).split('/')[0])
 
 # Set list of IP addreses to connect to if the -i input file is not used
 if not host_set:
@@ -264,7 +276,8 @@ for i in range(int(thread_num)):
     worker.start()
 
 for x in host_set:
-    queue.put(x)
+    if x not in excluded_devices:
+        queue.put(x)
 
 queue.join()
 
