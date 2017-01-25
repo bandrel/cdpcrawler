@@ -259,37 +259,37 @@ for opt, arg in opts:
                 [excluded_devices.append(str(host)) for host in network_address.hosts()]
             else:
                 excluded_devices.append(str(network_address).split('/')[0])
+if __name__ == "__main__":
+    # Set list of IP addreses to connect to if the -i input file is not used
+    if not host_set:
+        host_set.add(raw_input("Enter Switch Hostname or IP Address: ").upper())
+    if not username:
+        username = raw_input("Enter Username: ")
+    if not password:
+        password = getpass.getpass()
 
-# Set list of IP addreses to connect to if the -i input file is not used
-if not host_set:
-    host_set.add(raw_input("Enter Switch Hostname or IP Address: ").upper())
-if not username:
-    username = raw_input("Enter Username: ")
-if not password:
-    password = getpass.getpass()
+    queue = Queue.Queue()
 
-queue = Queue.Queue()
+    for i in range(int(thread_num)):
+        worker = WorkerThread(queue)
+        worker.setDaemon(True)
+        worker.start()
 
-for i in range(int(thread_num)):
-    worker = WorkerThread(queue)
-    worker.setDaemon(True)
-    worker.start()
+    for x in host_set:
+        if x not in excluded_devices:
+            queue.put(x)
 
-for x in host_set:
-    if x not in excluded_devices:
-        queue.put(x)
+    queue.join()
 
-queue.join()
-
-for host in failed_ssh:
-    if host in failed_telnet:
-        print('[!] %s failed both ssh and telnet' % host)
-inventory_dedupe = []
-[inventory_dedupe.append(i) for i in inventory_list if i not in inventory_dedupe]
-[inventory_ws.append(row) for row in inventory_list]
-neighbor_dedupe = []
-[neighbor_dedupe.append(i) for i in neighbor_list if i not in neighbor_dedupe]
-[neighbor_ws.append(row) for row in neighbor_dedupe]
-wb.save(outputfile)
-if graph_output:
-    creategraph(outputfile,graph_output)
+    for host in failed_ssh:
+        if host in failed_telnet:
+            print('[!] %s failed both ssh and telnet' % host)
+    inventory_dedupe = []
+    [inventory_dedupe.append(i) for i in inventory_list if i not in inventory_dedupe]
+    [inventory_ws.append(row) for row in inventory_list]
+    neighbor_dedupe = []
+    [neighbor_dedupe.append(i) for i in neighbor_list if i not in neighbor_dedupe]
+    [neighbor_ws.append(row) for row in neighbor_dedupe]
+    wb.save(outputfile)
+    if graph_output:
+        creategraph(outputfile,graph_output)
